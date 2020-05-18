@@ -1,0 +1,5 @@
+LZ77_DosyaSikistir(inputPath,1);
+clock_t end = clock();
+printf("\n\nSikistirilma suresi: ");
+printf("%f", ((double) (end - begin) / CLOCKS_PER_SEC));
+printf(" [saniye] \n\n");

@@ -1,0 +1,439 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <string.h>
+#include <locale.h>
+// windowSize = Sözluk boyutu
+// bufferSize = Bir kafa tampon boyutu
+#define windowSize 60
+#define bufferSize 40
+#define arraySize bufferSize + windowSize
+
+#define MAKSIMUM_DUGUM 1000
+
+char karakterler[arraySize];
+int frekanslar[arraySize];
+unsigned char str[arraySize];
+int GirdiBoyutu;
+
+struct YiginDugumu {
+	char veri;
+	unsigned frekans;
+	struct YiginDugumu *sol, *sag;
+};
+
+struct Yigin {
+	unsigned boyut;
+	unsigned capacity;
+	struct YiginDugumu** array;
+};
+
+struct YiginDugumu* Yeni_Dugum(char veri, unsigned frekans){
+	struct YiginDugumu* temp = (struct YiginDugumu*)malloc(sizeof(struct YiginDugumu));
+	temp->sol = temp->sag = NULL;
+	temp->veri = veri;
+	temp->frekans = frekans;
+	return temp;
+}
+
+struct Yigin* YiginOlustur(unsigned capacity){
+	struct Yigin* yigin = (struct Yigin*)malloc(sizeof(struct Yigin));
+	yigin->boyut = 0;
+	yigin->capacity = capacity;
+	yigin->array = (struct YiginDugumu**)malloc(yigin->capacity * sizeof(struct YiginDugumu*));
+	return yigin;
+}
+
+void Dugumleri_Takas_Et(struct YiginDugumu** a, struct YiginDugumu** b){
+	struct YiginDugumu* t = *a;
+	*a = *b;
+	*b = t;
+}
+
+void minHeapify(struct Yigin* yigin, int idx){
+	int enkucuk = idx;
+	int sol = 2 * idx + 1;
+	int sag = 2 * idx + 2;
+	if (sol < yigin->boyut && yigin->array[sol]->frekans < yigin->array[enkucuk]->frekans)
+		enkucuk = sol;
+
+	if (sag < yigin->boyut && yigin->array[sag]->frekans < yigin->array[enkucuk]->frekans)
+		enkucuk = sag;
+
+	if (enkucuk != idx) {
+		Dugumleri_Takas_Et(&yigin->array[enkucuk],&yigin->array[idx]);
+		minHeapify(yigin, enkucuk);
+	}
+}
+
+int Dugume_Deger_Ata(struct Yigin* yigin){
+	return (yigin->boyut == 1);
+}
+
+struct YiginDugumu* Dugumden_Cikar(struct Yigin* yigin){
+	struct YiginDugumu* temp = yigin->array[0];
+	yigin->array[0] = yigin->array[yigin->boyut - 1];
+	--yigin->boyut;
+	minHeapify(yigin, 0);
+	return temp;
+}
+
+void Dugum_Ekle(struct Yigin* yigin,struct YiginDugumu* yigin_dugumu){
+	++yigin->boyut;
+	int i = yigin->boyut - 1;
+	while (i && yigin_dugumu->frekans < yigin->array[(i - 1) / 2]->frekans) {
+		yigin->array[i] = yigin->array[(i - 1) / 2];
+		i = (i - 1) / 2;
+	}
+	yigin->array[i] = yigin_dugumu;
+}
+
+void buildYigin(struct Yigin* yigin){
+	int n = yigin->boyut - 1;
+	int i;
+	for (i = (n - 1) / 2; i >= 0; --i)
+		minHeapify(yigin, i);
+}
+
+void printArr(int arr[], int n){
+    FILE *fileInput;
+    fileInput = fopen("input/removefile.txt", "a");
+	int i;
+	for (i = 0; i < n; ++i){
+	    fprintf(fileInput,"%d",arr[i]);
+        //printf("%d", arr[i]);
+	}
+	//printf("\n");
+}
+
+int Yaprak_Mi(struct YiginDugumu* root){
+	return !(root->sol) && !(root->sag);
+}
+
+struct Yigin* Yigin_Dugumu_Olustur(char veri[], int frekans[], int boyut){
+	struct Yigin* yigin = YiginOlustur(boyut);
+	for (int i = 0; i < boyut; ++i)
+		yigin->array[i] = Yeni_Dugum(veri[i], frekans[i]);
+
+	yigin->boyut = boyut;
+	buildYigin(yigin);
+	return yigin;
+}
+
+struct YiginDugumu* Hufmman_Agaci_Olustur(char veri[], int frekans[], int boyut){
+	struct YiginDugumu *sol, *sag, *top;
+	struct Yigin* yigin = Yigin_Dugumu_Olustur(veri, frekans, boyut);
+	while (!Dugume_Deger_Ata(yigin)) {
+		sol = Dugumden_Cikar(yigin);
+		sag = Dugumden_Cikar(yigin);
+		top = Yeni_Dugum('$', sol->frekans + sag->frekans);
+		top->sol = sol;
+		top->sag = sag;
+		Dugum_Ekle(yigin, top);
+	}
+	return Dugumden_Cikar(yigin);
+}
+
+void printCodes(struct YiginDugumu* root, int arr[], int top){
+	if (root->sol) {
+		arr[top] = 0;
+		printCodes(root->sol, arr, top + 1);
+	}
+	if (root->sag) {
+		arr[top] = 1;
+		printCodes(root->sag, arr, top + 1);
+	}
+	if (Yaprak_Mi(root)) {
+		//printf("%c: ", root->veri);
+		printArr(arr, top);
+	}
+}
+
+void Huffman(char veri[], int frekans[], int boyut){
+	struct YiginDugumu* root = Hufmman_Agaci_Olustur(veri, frekans, boyut);
+	int arr[MAKSIMUM_DUGUM], top = 0;
+	FILE *fileInput;
+	char name[50];
+    char *inputPath = name;
+    inputPath = "removefile.txt";
+    char path[30] = "input/";
+    strcat(path, inputPath);
+    fileInput = fopen(path, "wb");
+	printCodes(root, arr, top);
+	LZ77_DosyaSikistir(inputPath,2);
+	remove(path);
+}
+
+typedef enum { false, true } bool;
+
+int findMatch(unsigned char window[], unsigned char str[], int strLen) {
+    int j, k, pos = -1;
+
+    for (int i = 0; i <= windowSize - strLen; i++) {
+        pos = k = i;
+
+        for (j = 0; j < strLen; j++) {
+            if (str[j] == window[k])
+                k++;
+            else
+                break;
+        }
+        if (j == strLen)
+            return pos;
+    }
+
+    return -1;
+}
+
+void FileReadChar(char* inputPath){
+    printf("\n------------------------------------------\nDosyadaki veriler karakter karakter okunuyor... \n\n");
+    FILE *fileInput;
+    char path[30] = "input/";
+    strcat(path, inputPath);
+    fileInput = fopen(path, "rb");
+    //char c;
+    //int f=0;
+    while (!feof(fileInput)) {
+        //cp = (char*) malloc(1*sizeof(char));
+        /*c = ;
+        str[f] = c;*/
+        printf("%c",fgetc(fileInput));
+        //f++;
+    }
+    printf("\n\n------------------------------------------\n\n");
+}
+
+int LZ77_DosyaSikistir(char* inputPath, int m) {
+    FILE *fileInput;
+    FILE *fileOutput;
+    bool last = false;
+    int inputLength = 0;
+    int outputLength = 0;
+    int endOffset = 0;
+    int pos = -1;
+    int i, size, shift, c_in;
+    size_t bytesRead = (size_t) -1;
+    unsigned char c;
+    unsigned char array[arraySize];
+    unsigned char window[windowSize];
+    unsigned char buffer[bufferSize];
+    unsigned char loadBuffer[bufferSize];
+    unsigned char str[bufferSize];
+
+    char path[30] = "input/";
+    strcat(path, inputPath);
+    fileInput = fopen(path, "rb");
+
+    // Eger dosya acilmiyor ise uyari dondur
+    if (!fileInput) {
+        fprintf(stderr, "Istenilen dosya bulunmadi %s", inputPath);
+        return 0;
+    }
+
+    // giris olan dosyanin boyutunu hesapla
+    fseek(fileInput, 0, SEEK_END);
+    inputLength = ftell(fileInput);
+    fseek(fileInput, 0, SEEK_SET);
+
+    if(m == 1){ // lz77 sikistirmasi
+        fileOutput = fopen("output/LZ77/metin.lz77", "wb");
+        GirdiBoyutu = inputLength;
+        fprintf(stdout, "Girdi dosyasinin boyutu: %d B", inputLength);
+    } else if(m == 2){ // deflate sikistirmasi
+        fileOutput = fopen("output/DEFLATE/metin.txt", "wb");
+        inputLength = GirdiBoyutu;
+        fprintf(stdout, "Girdi dosyasinin boyutu: %d B", GirdiBoyutu);
+    }
+
+    if (inputLength == 0) // eger dosya boyutu 0 byte ise
+        return 3;
+
+    if (inputLength < arraySize) // eger dosya boyutu 100 byte dan kucuk ise
+        return 2;
+
+    fread(array, 1, arraySize, fileInput);
+    fwrite(array, 1, windowSize, fileOutput);
+
+    // LZ77 basliyor..
+    while (true) {
+        if ((c_in = fgetc(fileInput)) == EOF)
+            last = true;
+        else
+            c = (unsigned char) c_in;
+
+        // Yukleme penceresi (dictionary)
+        for (int k = 0; k < windowSize; k++)
+            window[k] = array[k];
+
+        //Yuk tamponu (lookahead)
+        for (int k = windowSize, j = 0; k < arraySize; k++, j++) {
+            buffer[j] = array[k];
+            str[j] = array[k];
+        }
+
+        // Search for longest match in window
+        if (endOffset != 0) {
+            size = bufferSize - endOffset;
+            if (endOffset == bufferSize)
+                break;
+        }
+        else {
+            size = bufferSize;
+        }
+
+        pos = -1;
+        for (i = size; i > 0; i--) {
+            pos = findMatch(window, str, i);
+            if (pos != -1)
+                break;
+        }
+
+        // Es foundlesme bulunamadi
+        // Iki yerine sadece bir bayt yaz
+        // 255 - > of = set = 0, mat = ch = 0
+        if (pos == -1) {
+            fputc(255, fileOutput);
+            fputc(buffer[0], fileOutput);
+            shift = 1;
+        }
+
+        // offset = windowSize - position of match
+        // i = eslesme bayt sayisi
+        // endOffset = lookahead arabellegindeki bayt sayisi dikkate alinmayacak (EOF)
+        else {
+            fputc(windowSize - pos, fileOutput);
+            fputc(i, fileOutput);
+            if (i == bufferSize) {
+                shift = bufferSize + 1;
+                if (!last)
+                    fputc(c, fileOutput);
+                else
+                    endOffset = 1;
+            }
+            else {
+                if (i + endOffset != bufferSize)
+                    fputc(buffer[i], fileOutput);
+                else
+                    break;
+                shift = i + 1;
+            }
+        }
+
+        // Shift tamp buffonlari
+        for (int j = 0; j < arraySize - shift; j++)
+            array[j] = array[j + shift];
+        if (!last)
+            array[arraySize - shift] = c;
+
+        if (shift == 1 && last)
+            endOffset++;
+
+        // Eger (shift != 1) -> dosyadan daha fazla bayt oku
+        if (shift != 1) {
+            // Loadbuffer'i yeni baytlarla yukle
+            bytesRead = fread(loadBuffer, 1, (size_t) shift - 1, fileInput);
+
+            for (int k = 0, l = arraySize - shift + 1; k < shift - 1; k++, l++)
+                array[l] = loadBuffer[k];
+
+            if (last) {
+                endOffset += shift;
+                continue;
+            }
+
+            if (bytesRead < shift - 1)
+                endOffset = shift - 1 - bytesRead;
+        }
+    }
+
+    fseek(fileOutput, 0, SEEK_END);
+    outputLength = ftell(fileOutput); // cikti dosyasinin boyutunu hesapla
+    fseek(fileOutput, 0, SEEK_SET);
+
+    fprintf(stdout, "\nCikti dosyasinin boyutu: %d B\n", outputLength);
+
+    // dosyalari kapat
+    fclose(fileInput);
+    fclose(fileOutput);
+    return 1;
+}
+
+void LZ77(char* inputPath){
+    clock_t begin = clock();
+    LZ77_DosyaSikistir(inputPath,1);
+    clock_t end = clock();
+    printf("\n\nSikistirilma suresi: ");
+    printf("%f", ((double) (end - begin) / CLOCKS_PER_SEC));
+    printf(" [saniye] \n\n");
+}
+
+void DEFLATE(char* inputPath){
+    clock_t begin = clock();
+    DEFLATE_DosyaSikistir(inputPath);
+    clock_t end = clock();
+    printf("\n\nSikistirilma suresi: ");
+    printf("%f", ((double) (end - begin) / CLOCKS_PER_SEC));
+    printf(" [saniye] \n\n");
+}
+
+int frenkas_bul(char ch, char str[]){
+    int count = 0;
+    for (int i = 0; str[i] != '\0'; ++i) {
+        if (ch == str[i])
+            ++count;
+    }
+    return count;
+}
+
+void Karakterler_ve_Frekanslar(){
+    char bulunanKarakterler[arraySize];
+    int bulunanFrekanslar[arraySize];
+
+    int a,b,sayac=0,adet=0,freg=0;
+    for(a=0; a<strlen(str); ++a){
+        for(b=0; b<adet; b++){
+            if(bulunanKarakterler[b] == str[a]){
+                //printf("kiyak - ");
+                freg = bulunanFrekanslar[b];
+                sayac = 1;
+                break;
+            }
+        }
+        if(sayac == 0){
+            freg = frenkas_bul(str[a],str);
+            bulunanKarakterler[adet] = str[a];
+            bulunanFrekanslar[adet] = freg;
+            adet++;
+        }
+        karakterler[a] = str[a];
+        frekanslar[a] = freg;
+        sayac = 0;
+
+        //printf("k: %c, f: %d\n",karakterler[a],frekanslar[a]);
+    }
+}
+
+void DEFLATE_DosyaSikistir(char* inputPath){
+    FILE *fileInput;
+    char path[30] = "input/";
+    strcat(path, inputPath);
+    fileInput = fopen(path, "rb");
+    fread(str, 1, arraySize, fileInput);
+    Karakterler_ve_Frekanslar();
+	int boyut = sizeof(karakterler) / sizeof(karakterler[0]);
+	Huffman(karakterler, frekanslar, boyut);
+}
+
+int main() {
+    char name[50];
+    char *inputPath = name;
+    inputPath = "metin.txt";
+    FileReadChar(inputPath); // dosyadaki karakterleri okuyoruz
+    /* ------------ LZ77 -------------- */
+    printf("LZ77 algoritmasi dosya sikistirma icin baslatiliyor...\n\n");
+    LZ77(inputPath);
+    /* ------------ DEFLATE -------------- */
+    printf("DEFLATE algoritmasi dosya sikistirma icin baslatiliyor...\n\n");
+    DEFLATE(inputPath);
+    return 0;
+}
